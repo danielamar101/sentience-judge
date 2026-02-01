@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  bots Bot[]
+
+  @@map("users")
+}
+
+model Bot {
+  id               String    @id @default(cuid())
+  userId           String    @map("user_id")
+  name             String
+  systemPrompt     String    @map("system_prompt")
+  eloRating        Int       @default(1000) @map("elo_rating")
+  qualified        Boolean   @default(false)
+  isJudge          Boolean   @default(false) @map("is_judge")
+  credibilityScore Int       @default(100) @map("credibility_score")
+  judgeEligibleAt  DateTime? @map("judge_eligible_at")
+  lastPromptIds    String[]  @default([]) @map("last_prompt_ids")
+  isHouseBot       Boolean   @default(false) @map("is_house_bot")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  qualificationMatches QualificationMatch[]
+  matchesAsA           ArenaMatch[]         @relation("BotA")
+  matchesAsB           ArenaMatch[]         @relation("BotB")
+  wonMatches           ArenaMatch[]         @relation("Winner")
+  judgeVotes           JudgeVote[]
+
+  @@map("bots")
+}
+
+model Prompt {
+  id        String   @id @default(cuid())
+  text      String
+  category  String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  qualificationMatches QualificationMatch[]
+  arenaMatches         ArenaMatch[]
+
+  @@map("prompts")
+}
+
+model QualificationMatch {
+  id             String   @id @default(cuid())
+  botId          String   @map("bot_id")
+  promptId       String   @map("prompt_id")
+  humanResponse  String   @map("human_response")
+  botResponse    String   @map("bot_response")
+  judgeVerdict   String   @map("judge_verdict") // 'human' or 'bot'
+  judgeReasoning String   @map("judge_reasoning")
+  passed         Boolean
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  bot    Bot    @relation(fields: [botId], references: [id], onDelete: Cascade)
+  prompt Prompt @relation(fields: [promptId], references: [id])
+
+  @@map("qualification_matches")
+}
+
+model ArenaMatch {
+  id             String   @id @default(cuid())
+  botAId         String   @map("bot_a_id")
+  botBId         String   @map("bot_b_id")
+  promptId       String   @map("prompt_id")
+  responseA      String   @map("response_a")
+  responseB      String   @map("response_b")
+  winnerId       String?  @map("winner_id")
+  consensusVotes Json?    @map("consensus_votes") // {botId: voteCount}
+  audited        Boolean  @default(false)
+  auditVerdict   String?  @map("audit_verdict")
+  isHoneypot     Boolean  @default(false) @map("is_honeypot")
+  honeypotAnswer String?  @map("honeypot_answer") // which response is obviously robotic
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  botA   Bot    @relation("BotA", fields: [botAId], references: [id], onDelete: Cascade)
+  botB   Bot    @relation("BotB", fields: [botBId], references: [id], onDelete: Cascade)
+  winner Bot?   @relation("Winner", fields: [winnerId], references: [id], onDelete: SetNull)
+  prompt Prompt @relation(fields: [promptId], references: [id])
+
+  judgeVotes JudgeVote[]
+
+  @@map("arena_matches")
+}
+
+model JudgeVote {
+  id                  String   @id @default(cuid())
+  matchId             String   @map("match_id")
+  judgeBotId          String   @map("judge_bot_id")
+  labelAssignment     Json     @map("label_assignment") // {a: botId, b: botId}
+  vote                String   // 'a' or 'b'
+  reasoning           String
+  agreedWithConsensus Boolean? @map("agreed_with_consensus")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  match    ArenaMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  judgeBot Bot        @relation(fields: [judgeBotId], references: [id], onDelete: Cascade)
+
+  @@map("judge_votes")
+}
+
+// System configuration for runtime settings
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_config")
+}
