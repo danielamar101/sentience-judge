@@ -2,14 +2,12 @@ import { faker } from '@faker-js/faker';
 
 export function createTestUser(overrides: Partial<{
   id: string;
-  email: string;
-  passwordHash: string;
+  twitterHandle: string;
   createdAt: Date;
 }> = {}) {
   return {
     id: faker.string.uuid(),
-    email: faker.internet.email().toLowerCase(),
-    passwordHash: '$2b$12$mockhashvalue',
+    twitterHandle: faker.internet.username().toLowerCase().slice(0, 15),
     createdAt: new Date(),
     ...overrides,
   };

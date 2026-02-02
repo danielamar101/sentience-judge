@@ -1,5 +1,4 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -99,14 +98,11 @@ async function main() {
   console.log('Starting seed...');
 
   // Create a system user for house bots
-  const hashedPassword = await bcrypt.hash('system-password-not-for-login', 12);
-
   const systemUser = await prisma.user.upsert({
-    where: { email: 'system@mirror-arena.local' },
+    where: { twitterHandle: 'emergent_arena' },
     update: {},
     create: {
-      email: 'system@mirror-arena.local',
-      passwordHash: hashedPassword,
+      twitterHandle: 'emergent_arena',
     },
   });
 

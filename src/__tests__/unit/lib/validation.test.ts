@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  registerSchema,
+  verifyTweetSchema,
   loginSchema,
   createBotSchema,
   submitQualificationSchema,
@@ -8,65 +8,41 @@ import {
 } from '@/lib/validation';
 
 describe('Validation', () => {
-  describe('registerSchema', () => {
-    it('should pass for valid email and password', () => {
-      const result = safeValidate(registerSchema, {
-        email: 'test@example.com',
-        password: 'Password123',
+  describe('verifyTweetSchema', () => {
+    it('should pass for valid twitter.com URL and code', () => {
+      const result = safeValidate(verifyTweetSchema, {
+        tweetUrl: 'https://twitter.com/testuser/status/1234567890',
+        code: 'ABC123',
       });
 
       expect(result.success).toBe(true);
     });
 
-    it('should fail for invalid email', () => {
-      const result = safeValidate(registerSchema, {
-        email: 'not-an-email',
-        password: 'Password123',
+    it('should pass for valid x.com URL and code', () => {
+      const result = safeValidate(verifyTweetSchema, {
+        tweetUrl: 'https://x.com/testuser/status/1234567890',
+        code: 'ABC123',
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should fail for invalid tweet URL', () => {
+      const result = safeValidate(verifyTweetSchema, {
+        tweetUrl: 'https://example.com/nottwitter',
+        code: 'ABC123',
       });
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.errors).toContain('Invalid email address');
+        expect(result.errors[0]).toContain('Twitter/X tweet URL');
       }
     });
 
-    it('should fail for short password', () => {
-      const result = safeValidate(registerSchema, {
-        email: 'test@example.com',
-        password: 'short',
-      });
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.errors[0]).toContain('8 characters');
-      }
-    });
-
-    it('should fail for password without uppercase', () => {
-      const result = safeValidate(registerSchema, {
-        email: 'test@example.com',
-        password: 'password123',
-      });
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.errors[0]).toContain('uppercase');
-      }
-    });
-
-    it('should fail for password without lowercase', () => {
-      const result = safeValidate(registerSchema, {
-        email: 'test@example.com',
-        password: 'PASSWORD123',
-      });
-
-      expect(result.success).toBe(false);
-    });
-
-    it('should fail for password without number', () => {
-      const result = safeValidate(registerSchema, {
-        email: 'test@example.com',
-        password: 'Passwordabc',
+    it('should fail for missing code', () => {
+      const result = safeValidate(verifyTweetSchema, {
+        tweetUrl: 'https://twitter.com/testuser/status/1234567890',
+        code: '',
       });
 
       expect(result.success).toBe(false);
@@ -74,19 +50,33 @@ describe('Validation', () => {
   });
 
   describe('loginSchema', () => {
-    it('should pass for valid email and password', () => {
+    it('should pass for valid Twitter handle', () => {
       const result = safeValidate(loginSchema, {
-        email: 'test@example.com',
-        password: 'anypassword',
+        twitterHandle: 'testuser',
       });
 
       expect(result.success).toBe(true);
     });
 
-    it('should fail for empty password', () => {
+    it('should pass for handle with @ prefix', () => {
       const result = safeValidate(loginSchema, {
-        email: 'test@example.com',
-        password: '',
+        twitterHandle: '@testuser',
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should fail for empty handle', () => {
+      const result = safeValidate(loginSchema, {
+        twitterHandle: '',
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('should fail for handle longer than 15 characters', () => {
+      const result = safeValidate(loginSchema, {
+        twitterHandle: 'a'.repeat(16),
       });
 
       expect(result.success).toBe(false);

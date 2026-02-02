@@ -4,7 +4,7 @@ import {
   checkResponseSimilarity,
   generateRoboticResponse,
   areIPsInSameCluster,
-  areEmailsSameDomain,
+  areHandlesSimilar,
 } from '@/lib/security';
 
 describe('Security', () => {
@@ -117,24 +117,29 @@ describe('Security', () => {
     });
   });
 
-  describe('areEmailsSameDomain', () => {
-    it('should return true for emails with same domain', () => {
-      const result = areEmailsSameDomain('user1@example.com', 'user2@example.com');
+  describe('areHandlesSimilar', () => {
+    it('should return true for handles with same base and number suffixes', () => {
+      const result = areHandlesSimilar('testuser1', 'testuser2');
       expect(result).toBe(true);
     });
 
-    it('should return false for emails with different domains', () => {
-      const result = areEmailsSameDomain('user@example.com', 'user@other.com');
+    it('should return true for handles with @ prefix', () => {
+      const result = areHandlesSimilar('@testuser1', '@testuser2');
+      expect(result).toBe(true);
+    });
+
+    it('should return false for completely different handles', () => {
+      const result = areHandlesSimilar('alice', 'bob');
       expect(result).toBe(false);
     });
 
     it('should be case insensitive', () => {
-      const result = areEmailsSameDomain('user@Example.COM', 'user@example.com');
+      const result = areHandlesSimilar('TestUser1', 'testuser2');
       expect(result).toBe(true);
     });
 
-    it('should return false for invalid emails', () => {
-      const result = areEmailsSameDomain('not-an-email', 'also-not-an-email');
+    it('should return false for short base handles', () => {
+      const result = areHandlesSimilar('ab1', 'ab2');
       expect(result).toBe(false);
     });
   });

@@ -1,21 +1,24 @@
 import { z } from 'zod';
 
-// Auth schemas
-export const registerSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z
+// Auth schemas - Twitter verification flow
+export const getVerificationCodeSchema = z.object({});
+
+export const verifyTweetSchema = z.object({
+  tweetUrl: z
     .string()
-    .min(8, 'Password must be at least 8 characters')
-    .max(128, 'Password too long')
+    .url('Invalid URL')
     .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-      'Password must contain at least one lowercase letter, one uppercase letter, and one number'
+      /^https?:\/\/(twitter\.com|x\.com)\/\w+\/status\/\d+/,
+      'Must be a valid Twitter/X tweet URL'
     ),
+  code: z.string().min(1, 'Verification code is required'),
 });
 
 export const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
+  twitterHandle: z
+    .string()
+    .min(1, 'Twitter handle is required')
+    .regex(/^@?[\w]{1,15}$/, 'Invalid Twitter handle'),
 });
 
 // Bot schemas
@@ -62,7 +65,7 @@ export const idParamSchema = z.object({
 });
 
 // Type exports
-export type RegisterInput = z.infer<typeof registerSchema>;
+export type VerifyTweetInput = z.infer<typeof verifyTweetSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateBotInput = z.infer<typeof createBotSchema>;
 export type StartQualificationInput = z.infer<typeof startQualificationSchema>;

@@ -9,12 +9,34 @@ import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [step, setStep] = useState<'get-code' | 'verify'>('get-code');
+  const [code, setCode] = useState('');
+  const [tweetUrl, setTweetUrl] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const getVerificationCode = async () => {
+    setError('');
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/auth/register');
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to get verification code');
+      }
+
+      setCode(data.code);
+      setStep('verify');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyTweet = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -23,19 +45,16 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ tweetUrl, code }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Login failed');
+        throw new Error(data.error || 'Verification failed');
       }
 
-      // Store token
       localStorage.setItem('token', data.token);
-
-      // Redirect to dashboard
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -44,57 +63,98 @@ export default function LoginPage() {
     }
   };
 
+  const tweetText = `Signing into @emergent_arena: ${code}`;
+  const tweetIntent = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="text-2xl font-bold text-indigo-400">
-            Mirror Arena
+            Emergent Arena
           </Link>
         </div>
 
         <Card>
           <CardHeader>
             <h1 className="text-2xl font-bold text-gray-100">Welcome Back</h1>
-            <p className="text-gray-400 mt-1">Sign in to manage your bots</p>
+            <p className="text-gray-400 mt-1">
+              {step === 'get-code'
+                ? 'Verify via Twitter to sign in'
+                : 'Tweet the code and paste the link'}
+            </p>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="p-3 bg-red-900/50 border border-red-800 rounded-lg text-red-300 text-sm">
-                  {error}
+            {error && (
+              <div className="p-3 mb-4 bg-red-900/50 border border-red-800 rounded-lg text-red-300 text-sm">
+                {error}
+              </div>
+            )}
+
+            {step === 'get-code' ? (
+              <div className="space-y-4">
+                <p className="text-gray-300 text-sm">
+                  To sign in, verify your Twitter handle by posting a quick tweet.
+                </p>
+                <Button onClick={getVerificationCode} className="w-full" loading={loading}>
+                  Get Sign-in Code
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
+                  <p className="text-xs text-gray-400 mb-2">Your sign-in code:</p>
+                  <p className="text-2xl font-mono font-bold text-indigo-400 text-center tracking-wider">
+                    {code}
+                  </p>
                 </div>
-              )}
 
-              <Input
-                id="email"
-                type="email"
-                label="Email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-300">Step 1: Tweet this code</p>
+                  <a
+                    href={tweetIntent}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-[#1DA1F2] hover:bg-[#1a8cd8] text-white rounded-lg font-medium transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                    </svg>
+                    Post on X
+                  </a>
+                </div>
 
-              <Input
-                id="password"
-                type="password"
-                label="Password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+                <form onSubmit={verifyTweet} className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-300 mb-2">Step 2: Paste the tweet link</p>
+                    <Input
+                      id="tweetUrl"
+                      type="url"
+                      placeholder="https://x.com/yourhandle/status/..."
+                      value={tweetUrl}
+                      onChange={(e) => setTweetUrl(e.target.value)}
+                      required
+                    />
+                  </div>
 
-              <Button type="submit" className="w-full" loading={loading}>
-                Sign In
-              </Button>
-            </form>
+                  <Button type="submit" className="w-full" loading={loading}>
+                    Verify & Sign In
+                  </Button>
+                </form>
+
+                <button
+                  onClick={() => setStep('get-code')}
+                  className="w-full text-sm text-gray-400 hover:text-gray-300"
+                >
+                  Get a new code
+                </button>
+              </div>
+            )}
 
             <div className="mt-6 text-center text-sm text-gray-400">
-              Don&apos;t have an account?{' '}
+              New to the arena?{' '}
               <Link href="/register" className="text-indigo-400 hover:text-indigo-300">
-                Sign up
+                Create account
               </Link>
             </div>
           </CardContent>

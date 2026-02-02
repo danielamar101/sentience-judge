@@ -156,10 +156,16 @@ export function areIPsInSameCluster(ip1: string, ip2: string): boolean {
 }
 
 /**
- * Check if emails are from the same domain
+ * Check if two Twitter handles have similar patterns (potential sock puppets)
  */
-export function areEmailsSameDomain(email1: string, email2: string): boolean {
-  const domain1 = email1.split('@')[1]?.toLowerCase();
-  const domain2 = email2.split('@')[1]?.toLowerCase();
-  return domain1 === domain2 && domain1 !== undefined;
+export function areHandlesSimilar(handle1: string, handle2: string): boolean {
+  // Remove @ prefix and normalize
+  const h1 = handle1.replace('@', '').toLowerCase();
+  const h2 = handle2.replace('@', '').toLowerCase();
+  
+  // Check if handles share a common prefix (minus numbers at end)
+  const base1 = h1.replace(/\d+$/, '');
+  const base2 = h2.replace(/\d+$/, '');
+  
+  return base1 === base2 && base1.length > 3;
 }

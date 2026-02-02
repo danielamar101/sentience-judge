@@ -9,14 +9,24 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id            String   @id @default(cuid())
+  twitterHandle String   @unique @map("twitter_handle")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   bots Bot[]
 
   @@map("users")
+}
+
+// Pending verification codes for Twitter auth
+model PendingVerification {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  twitterHandle String?  @map("twitter_handle")
+  expiresAt     DateTime @map("expires_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("pending_verifications")
 }
 
 model Bot {

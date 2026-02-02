@@ -1,76 +1,49 @@
-import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
-import { redis as ioRedis } from './redis';
+import { redis } from './redis';
 import { RateLimitError } from './errors';
 
-// Use Upstash Redis if configured, otherwise use ioredis
-function getRedisClient() {
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    return Redis.fromEnv();
-  }
-  // For local development, create a custom adapter
-  return {
-    eval: async (...args: unknown[]) => {
-      // @ts-expect-error - ioredis eval signature differs
-      return ioRedis.eval(...args);
-    },
-  } as unknown as Redis;
-}
-
-const redisClient = getRedisClient();
-
-// Rate limiters per the specification
-export const rateLimiters = {
+// Simple rate limiter config
+const RATE_LIMITS = {
   // POST /api/auth/register - 3 per hour per IP
-  register: new Ratelimit({
-    redis: redisClient,
-    limiter: Ratelimit.slidingWindow(3, '1h'),
-    prefix: 'ratelimit:register',
-  }),
-
-  // POST /api/auth/login - 5 per 15 min per IP+email
-  login: new Ratelimit({
-    redis: redisClient,
-    limiter: Ratelimit.slidingWindow(5, '15m'),
-    prefix: 'ratelimit:login',
-  }),
-
+  register: { max: 3, windowSec: 3600 },
+  // POST /api/auth/login - 5 per 15 min per IP
+  login: { max: 5, windowSec: 900 },
   // POST /api/bots - 3 per 24 hours per userId
-  botCreate: new Ratelimit({
-    redis: redisClient,
-    limiter: Ratelimit.slidingWindow(3, '24h'),
-    prefix: 'ratelimit:bot-create',
-  }),
-
+  botCreate: { max: 3, windowSec: 86400 },
   // POST /api/qualification - 1 per hour per botId
-  qualification: new Ratelimit({
-    redis: redisClient,
-    limiter: Ratelimit.slidingWindow(1, '1h'),
-    prefix: 'ratelimit:qualification',
-  }),
-
+  qualification: { max: 1, windowSec: 3600 },
   // Global API limit - 100 per minute per IP
-  global: new Ratelimit({
-    redis: redisClient,
-    limiter: Ratelimit.slidingWindow(100, '1m'),
-    prefix: 'ratelimit:global',
-  }),
+  global: { max: 100, windowSec: 60 },
 };
 
-export type RateLimiterKey = keyof typeof rateLimiters;
+export type RateLimiterKey = keyof typeof RATE_LIMITS;
 
 export async function checkRateLimit(
   limiterKey: RateLimiterKey,
   identifier: string
 ): Promise<void> {
-  const limiter = rateLimiters[limiterKey];
-  const { success, reset } = await limiter.limit(identifier);
+  const config = RATE_LIMITS[limiterKey];
+  const key = `ratelimit:${limiterKey}:${identifier}`;
 
-  if (!success) {
-    const retryAfter = Math.ceil((reset - Date.now()) / 1000);
-    throw new RateLimitError(
-      `Rate limit exceeded. Try again in ${retryAfter} seconds.`
-    );
+  try {
+    const current = await redis.incr(key);
+
+    if (current === 1) {
+      // First request, set expiry
+      await redis.expire(key, config.windowSec);
+    }
+
+    if (current > config.max) {
+      const ttl = await redis.ttl(key);
+      throw new RateLimitError(
+        `Rate limit exceeded. Try again in ${ttl} seconds.`
+      );
+    }
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      throw error;
+    }
+    // If Redis is down, log and continue (fail open)
+    console.warn('Rate limit check failed:', error);
   }
 }
 
@@ -78,7 +51,21 @@ export async function getRateLimitInfo(
   limiterKey: RateLimiterKey,
   identifier: string
 ): Promise<{ remaining: number; reset: number }> {
-  const limiter = rateLimiters[limiterKey];
-  const { remaining, reset } = await limiter.limit(identifier);
-  return { remaining, reset };
+  const config = RATE_LIMITS[limiterKey];
+  const key = `ratelimit:${limiterKey}:${identifier}`;
+
+  try {
+    const current = parseInt(await redis.get(key) || '0', 10);
+    const ttl = await redis.ttl(key);
+
+    return {
+      remaining: Math.max(0, config.max - current),
+      reset: ttl > 0 ? Date.now() + ttl * 1000 : Date.now() + config.windowSec * 1000,
+    };
+  } catch {
+    return {
+      remaining: config.max,
+      reset: Date.now() + config.windowSec * 1000,
+    };
+  }
 }

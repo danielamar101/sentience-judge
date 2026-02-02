@@ -1,29 +1,24 @@
-import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { NextRequest } from 'next/server';
 import { UnauthorizedError } from './errors';
-
-const SALT_ROUNDS = 12;
+import crypto from 'crypto';
 
 const JWT_CONFIG = {
   secret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
-  expiresIn: '24h' as const,
+  expiresIn: '7d' as const,
   algorithm: 'HS256' as const,
 };
 
 export interface JwtPayload {
   userId: string;
-  email: string;
+  twitterHandle: string;
   iat?: number;
   exp?: number;
 }
 
-export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, SALT_ROUNDS);
-}
-
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
+export function generateVerificationCode(): string {
+  // Generate a 6-character alphanumeric code
+  return crypto.randomBytes(3).toString('hex').toUpperCase();
 }
 
 export function createToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
@@ -76,4 +71,11 @@ export function getAuthFromCookie(request: NextRequest): JwtPayload | null {
   } catch {
     return null;
   }
+}
+
+// Extract Twitter handle from tweet URL
+export function extractTwitterHandle(tweetUrl: string): string | null {
+  const match = tweetUrl.match(/(?:twitter\.com|x\.com)\/(@?[\w]+)\/status\/\d+/);
+  if (!match) return null;
+  return match[1].replace('@', '').toLowerCase();
 }
