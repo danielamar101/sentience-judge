@@ -7,7 +7,7 @@ const MIN_JUDGE_POOL = 10;
 const CREDIBILITY_FLOOR = 30;
 const CREDIBILITY_THRESHOLD = 50;
 const JUDGE_AGE_DAYS = 7;
-const REQUIRED_QUALIFIED_BOTS = 3;
+const MIN_ARENA_MATCHES = 5; // Bot must have competed in at least 5 arena matches
 const HONEYPOT_PROBABILITY = 0.05; // 5% of matches
 const AUDIT_PROBABILITY = 0.1; // 10% of matches
 
@@ -320,13 +320,9 @@ export async function checkJudgeEligibility(botId: string): Promise<boolean> {
   const bot = await prisma.bot.findUnique({
     where: { id: botId },
     include: {
-      user: {
-        include: {
-          bots: {
-            where: { qualified: true },
-          },
-        },
-      },
+      user: true,
+      matchesAsA: { select: { id: true } },
+      matchesAsB: { select: { id: true } },
     },
   });
 
@@ -340,8 +336,9 @@ export async function checkJudgeEligibility(botId: string): Promise<boolean> {
   const sevenDaysMs = JUDGE_AGE_DAYS * 24 * 60 * 60 * 1000;
   if (accountAge < sevenDaysMs) return false;
 
-  // User must have at least 3 qualified bots
-  if (bot.user.bots.length < REQUIRED_QUALIFIED_BOTS) return false;
+  // Bot must have competed in at least MIN_ARENA_MATCHES matches
+  const totalMatches = bot.matchesAsA.length + bot.matchesAsB.length;
+  if (totalMatches < MIN_ARENA_MATCHES) return false;
 
   return true;
 }

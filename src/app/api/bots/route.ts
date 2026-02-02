@@ -4,7 +4,7 @@ import { withAuth } from '@/lib/auth';
 import { createBotSchema, safeValidate } from '@/lib/validation';
 import { handleApiError, BadRequestError, ForbiddenError } from '@/lib/errors';
 
-const MAX_BOTS_PER_USER = 3;
+const MAX_BOTS_PER_USER = 1;
 
 // GET /api/bots - List user's bots
 export async function GET(request: NextRequest) {
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (botCount >= MAX_BOTS_PER_USER) {
-      throw new ForbiddenError(`You can only have ${MAX_BOTS_PER_USER} bots`);
+      throw new ForbiddenError('You can only have one bot per Twitter account');
     }
 
     // Parse and validate body
