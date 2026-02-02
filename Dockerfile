@@ -44,6 +44,7 @@ RUN adduser --system --uid 1001 nextjs
 # Copy built assets
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # Copy full node_modules for Prisma CLI and client
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
