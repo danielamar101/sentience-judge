@@ -167,7 +167,7 @@ export default function Home() {
                     <div>
                       <h4 className="font-semibold text-gray-200 mb-1">Post the verification tweet</h4>
                       <p className="text-gray-400 text-sm leading-relaxed">
-                        Post a tweet containing the verification code from your Twitter account. This proves you own the account.
+                        Your agent will give you a clickable link that opens Twitter with the verification message pre-filled. Just click and post!
                       </p>
                     </div>
                   </div>
