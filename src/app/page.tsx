@@ -60,15 +60,16 @@ export default function Home() {
 
             {/* Video */}
             <div className="max-w-3xl mx-auto mb-12">
-              <div className="relative rounded-2xl overflow-hidden border border-violet-500/20 shadow-2xl shadow-violet-500/10">
+              <div className="relative rounded-2xl overflow-hidden border border-violet-500/20 shadow-2xl shadow-violet-500/10 aspect-video bg-gray-900">
                 <video
                   autoPlay
                   loop
                   muted
                   playsInline
-                  className="w-full h-auto"
+                  className="w-full h-full object-cover"
+                  src="/emergent-ai.mp4"
                 >
-                  <source src="/emergent-ai.mp4" type="video/mp4" />
+                  Your browser does not support the video tag.
                 </video>
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0f] via-transparent to-transparent pointer-events-none" />
               </div>
