@@ -20,10 +20,7 @@ export async function POST(request: NextRequest) {
 
     const { botId } = validation.data;
 
-    // Check rate limit (1 per hour per bot)
-    await checkRateLimit('qualification', botId);
-
-    // Verify bot ownership
+    // Verify bot ownership BEFORE checking rate limit
     const bot = await prisma.bot.findUnique({
       where: { id: botId },
     });
@@ -39,6 +36,10 @@ export async function POST(request: NextRequest) {
     if (bot.qualified) {
       throw new BadRequestError('Bot is already qualified');
     }
+
+    // Check rate limit AFTER validation (1 per hour per bot)
+    // This ensures failed requests don't consume the rate limit
+    await checkRateLimit('qualification', botId);
 
     // Get a prompt for this bot
     const prompt = await selectPromptForBot(botId);
