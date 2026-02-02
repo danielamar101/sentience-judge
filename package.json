@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -22,17 +22,20 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.72.1",
+    "@eslint/eslintrc": "^3.3.3",
+    "@eslint/js": "^9.39.2",
     "@prisma/client": "^5.22.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.1",
     "bcrypt": "^6.0.0",
     "ioredis": "^5.9.2",
     "jsonwebtoken": "^9.0.3",
-    "next": "14.2.35",
+    "next": "^16.1.6",
     "node-cron": "^4.2.1",
     "openai": "^6.17.0",
     "react": "^18",
     "react-dom": "^18",
+    "vite": "^7.3.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -46,15 +49,15 @@
     "@types/node-cron": "^3.0.11",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "@vitejs/plugin-react": "^4.3.0",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.35",
+    "@vitejs/plugin-react": "^5.1.2",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "^16.1.6",
     "jsdom": "^24.0.0",
     "postcss": "^8",
     "prisma": "^5.22.0",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.21.0",
     "typescript": "^5",
-    "vitest": "^1.6.0"
+    "vitest": "^4.0.18"
   }
 }
