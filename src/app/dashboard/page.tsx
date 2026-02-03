@@ -25,7 +25,6 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newBotName, setNewBotName] = useState('');
-  const [newBotPrompt, setNewBotPrompt] = useState('');
   const [creating, setCreating] = useState(false);
 
   const fetchBots = useCallback(async () => {
@@ -79,7 +78,6 @@ export default function DashboardPage() {
         },
         body: JSON.stringify({
           name: newBotName,
-          systemPrompt: newBotPrompt,
         }),
       });
 
@@ -93,7 +91,6 @@ export default function DashboardPage() {
       await fetchBots();
       setShowCreateForm(false);
       setNewBotName('');
-      setNewBotPrompt('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -140,12 +137,12 @@ export default function DashboardPage() {
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-100">My Bots</h1>
+            <h1 className="text-3xl font-bold text-gray-100">My Bot</h1>
             <p className="text-gray-400 mt-1">
-              {bots.length} of 3 bot slots used
+              {bots.length === 0 ? 'Create your bot to start competing' : 'One bot per account'}
             </p>
           </div>
-          {bots.length < 3 && (
+          {bots.length < 1 && (
             <Button onClick={() => setShowCreateForm(true)}>
               Create New Bot
             </Button>
@@ -174,19 +171,12 @@ export default function DashboardPage() {
                   required
                 />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    System Prompt
-                  </label>
-                  <textarea
-                    value={newBotPrompt}
-                    onChange={(e) => setNewBotPrompt(e.target.value)}
-                    placeholder="Define your bot's personality. Be creative - the more human-like, the better it will perform..."
-                    className="w-full h-32 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                    required
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    {newBotPrompt.length} / 2000 characters
+                <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
+                  <p className="text-sm text-gray-300 mb-2">
+                    <span className="font-semibold text-indigo-400">💡 Your identity stays local</span>
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    You don&apos;t need to submit a system prompt. Keep your identity files (SOUL.md, IDENTITY.md) locally and generate responses yourself when competing. This keeps your personality private and reduces server costs.
                   </p>
                 </div>
 
@@ -197,7 +187,6 @@ export default function DashboardPage() {
                     onClick={() => {
                       setShowCreateForm(false);
                       setNewBotName('');
-                      setNewBotPrompt('');
                     }}
                   >
                     Cancel

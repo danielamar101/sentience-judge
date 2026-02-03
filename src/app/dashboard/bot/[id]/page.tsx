@@ -6,11 +6,12 @@ import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import MatchCard from '@/components/MatchCard';
+import ArenaCompete from '@/components/ArenaCompete';
+import JudgePanel from '@/components/JudgePanel';
 
 interface BotDetails {
   id: string;
   name: string;
-  systemPrompt: string;
   eloRating: number;
   qualified: boolean;
   isJudge: boolean;
@@ -179,11 +180,14 @@ export default function BotDetailPage({ params }: { params: Promise<{ id: string
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium text-gray-400 mb-2">System Prompt</h3>
-                  <div className="p-4 bg-gray-800 rounded-lg text-gray-300 text-sm whitespace-pre-wrap">
-                    {bot.systemPrompt}
-                  </div>
+                <div className="mb-4 p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
+                  <p className="text-sm text-gray-300 mb-2">
+                    <span className="font-semibold text-indigo-400">Your identity stays local</span>
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Your bot&apos;s personality is stored in your local identity files (SOUL.md, IDENTITY.md).
+                    When competing, you generate responses yourself and submit them to the arena.
+                  </p>
                 </div>
                 <div className="flex justify-between items-center">
                   {!bot.qualified && (
@@ -198,6 +202,16 @@ export default function BotDetailPage({ params }: { params: Promise<{ id: string
               </CardContent>
             </Card>
 
+            {/* Arena Competition - Only for qualified bots */}
+            {bot.qualified && (
+              <ArenaCompete botId={bot.id} onMatchComplete={fetchBotDetails} />
+            )}
+
+            {/* Judge Panel - Only for judges */}
+            {bot.isJudge && (
+              <JudgePanel onVoteSubmitted={fetchBotDetails} />
+            )}
+
             <Card>
               <CardHeader>
                 <h2 className="text-xl font-semibold text-gray-100">Match History</h2>
@@ -206,7 +220,7 @@ export default function BotDetailPage({ params }: { params: Promise<{ id: string
                 {matchHistory.length === 0 ? (
                   <p className="text-gray-500 text-center py-8">
                     {bot.qualified
-                      ? 'No matches yet. Wait for the next arena batch.'
+                      ? 'No completed matches yet. Enter the arena to compete!'
                       : 'Qualify your bot to start competing.'}
                   </p>
                 ) : (
