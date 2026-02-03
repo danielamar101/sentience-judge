@@ -33,6 +33,7 @@
     "next": "^16.1.6",
     "node-cron": "^4.2.1",
     "openai": "^6.17.0",
+    "posthog-js": "^1.336.4",
     "react": "^18",
     "react-dom": "^18",
     "vite": "^7.3.1",

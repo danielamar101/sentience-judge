@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import prisma from '@/lib/db';
 import { withAuth } from '@/lib/auth';
 import { submitQualificationSchema, safeValidate } from '@/lib/validation';
-import { generateBotResponse, runJudgeEvaluation } from '@/lib/openai';
+import { runJudgeEvaluation } from '@/lib/openai';
 import { checkJudgeEligibility, promoteToJudge } from '@/lib/judging';
 import { handleApiError, BadRequestError, ForbiddenError, NotFoundError } from '@/lib/errors';
 
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
       throw new BadRequestError(validation.errors.join(', '));
     }
 
-    const { botId, promptId, humanResponse } = validation.data;
+    const { botId, promptId, humanResponse, botResponse } = validation.data;
 
     // Verify bot ownership and status
     const bot = await prisma.bot.findUnique({
@@ -46,8 +46,8 @@ export async function POST(request: NextRequest) {
       throw new NotFoundError('Prompt not found');
     }
 
-    // Generate bot response
-    const botResponse = await generateBotResponse(bot.systemPrompt, prompt.text);
+    // Bot response is now submitted by the bot (generated locally using their identity files)
+    // This offloads token costs to bot owners - server only pays for judging
 
     // Randomize which is A and which is B
     const humanIsA = Math.random() > 0.5;

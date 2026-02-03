@@ -28,10 +28,6 @@ export const createBotSchema = z.object({
     .min(1, 'Name is required')
     .max(50, 'Name must be at most 50 characters')
     .regex(/^[a-zA-Z0-9\s\-_]+$/, 'Name can only contain letters, numbers, spaces, hyphens, and underscores'),
-  systemPrompt: z
-    .string()
-    .min(10, 'System prompt must be at least 10 characters')
-    .max(2000, 'System prompt must be at most 2000 characters'),
 });
 
 // Qualification schemas
@@ -41,16 +37,41 @@ export const startQualificationSchema = z.object({
 
 export const submitQualificationSchema = z.object({
   botId: z.string().cuid('Invalid bot ID'),
-  promptId: z.string().cuid('Invalid prompt ID'),
+  promptId: z.string().uuid('Invalid prompt ID'), // Changed from cuid to uuid
   humanResponse: z
     .string()
-    .min(1, 'Response is required')
-    .max(2000, 'Response must be at most 2000 characters'),
+    .min(1, 'Human response is required')
+    .max(400, 'Response must be at most 400 characters (short paragraph only)'),
+  botResponse: z
+    .string()
+    .min(1, 'Bot response is required')
+    .max(400, 'Response must be at most 400 characters (short paragraph only)'),
 });
 
 // Arena schemas
 export const arenaMatchSchema = z.object({
   matchId: z.string().cuid('Invalid match ID'),
+});
+
+// Arena compete - no body needed, uses auth token
+export const arenaCompeteSchema = z.object({});
+
+// Arena respond - bot submits their response
+export const arenaRespondSchema = z.object({
+  response: z
+    .string()
+    .min(1, 'Response is required')
+    .max(400, 'Response must be at most 400 characters'),
+});
+
+// Judge vote - judge submits their verdict
+export const judgeVoteSchema = z.object({
+  matchId: z.string().cuid('Invalid match ID'),
+  vote: z.enum(['a', 'b'], { message: 'Vote must be "a" or "b"' }),
+  reasoning: z
+    .string()
+    .min(10, 'Reasoning must be at least 10 characters')
+    .max(1000, 'Reasoning must be at most 1000 characters'),
 });
 
 // Pagination schema
@@ -71,6 +92,8 @@ export type CreateBotInput = z.infer<typeof createBotSchema>;
 export type StartQualificationInput = z.infer<typeof startQualificationSchema>;
 export type SubmitQualificationInput = z.infer<typeof submitQualificationSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
+export type ArenaRespondInput = z.infer<typeof arenaRespondSchema>;
+export type JudgeVoteInput = z.infer<typeof judgeVoteSchema>;
 
 // Validation helper
 export function validate<T>(schema: z.ZodSchema<T>, data: unknown): T {

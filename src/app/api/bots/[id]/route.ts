@@ -64,15 +64,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       throw new ForbiddenError('You do not own this bot');
     }
 
-    // Combine and format match history
+    // Combine and format match history (filter out matches without opponents)
     const matchHistory = [
-      ...bot.matchesAsA.map((m) => ({
-        id: m.id,
-        opponentId: m.botBId,
-        opponentName: m.botB.name,
-        won: m.winnerId === bot.id,
-        createdAt: m.createdAt,
-      })),
+      ...bot.matchesAsA
+        .filter((m) => m.botB !== null)
+        .map((m) => ({
+          id: m.id,
+          opponentId: m.botBId,
+          opponentName: m.botB!.name,
+          won: m.winnerId === bot.id,
+          createdAt: m.createdAt,
+        })),
       ...bot.matchesAsB.map((m) => ({
         id: m.id,
         opponentId: m.botAId,

@@ -84,10 +84,9 @@ describe('Validation', () => {
   });
 
   describe('createBotSchema', () => {
-    it('should pass for valid name and prompt', () => {
+    it('should pass for valid name', () => {
       const result = safeValidate(createBotSchema, {
         name: 'MyBot',
-        systemPrompt: 'You are a helpful assistant with a friendly personality.',
       });
 
       expect(result.success).toBe(true);
@@ -96,7 +95,6 @@ describe('Validation', () => {
     it('should fail for name with special characters', () => {
       const result = safeValidate(createBotSchema, {
         name: 'My@Bot!',
-        systemPrompt: 'You are a helpful assistant.',
       });
 
       expect(result.success).toBe(false);
@@ -105,28 +103,14 @@ describe('Validation', () => {
     it('should fail for name too long', () => {
       const result = safeValidate(createBotSchema, {
         name: 'a'.repeat(51),
-        systemPrompt: 'You are a helpful assistant.',
       });
 
       expect(result.success).toBe(false);
     });
 
-    it('should fail for prompt too short', () => {
+    it('should fail for empty name', () => {
       const result = safeValidate(createBotSchema, {
-        name: 'MyBot',
-        systemPrompt: 'Short',
-      });
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.errors[0]).toContain('10 characters');
-      }
-    });
-
-    it('should fail for prompt too long', () => {
-      const result = safeValidate(createBotSchema, {
-        name: 'MyBot',
-        systemPrompt: 'a'.repeat(2001),
+        name: '',
       });
 
       expect(result.success).toBe(false);
@@ -135,7 +119,6 @@ describe('Validation', () => {
     it('should allow spaces, hyphens, and underscores in name', () => {
       const result = safeValidate(createBotSchema, {
         name: 'My Bot-Name_Here',
-        systemPrompt: 'You are a helpful assistant.',
       });
 
       expect(result.success).toBe(true);
@@ -143,11 +126,12 @@ describe('Validation', () => {
   });
 
   describe('submitQualificationSchema', () => {
-    it('should pass for valid input', () => {
+    it('should pass for valid input with both responses', () => {
       const result = safeValidate(submitQualificationSchema, {
         botId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx',
-        promptId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx',
+        promptId: '550e8400-e29b-41d4-a716-446655440000',
         humanResponse: 'This is my human response to the prompt.',
+        botResponse: 'This is the bot response generated locally.',
       });
 
       expect(result.success).toBe(true);
@@ -156,18 +140,41 @@ describe('Validation', () => {
     it('should fail for invalid bot ID', () => {
       const result = safeValidate(submitQualificationSchema, {
         botId: 'invalid-id',
-        promptId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx',
+        promptId: '550e8400-e29b-41d4-a716-446655440000',
         humanResponse: 'This is my response.',
+        botResponse: 'This is the bot response.',
       });
 
       expect(result.success).toBe(false);
     });
 
-    it('should fail for empty response', () => {
+    it('should fail for empty human response', () => {
       const result = safeValidate(submitQualificationSchema, {
         botId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx',
-        promptId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx',
+        promptId: '550e8400-e29b-41d4-a716-446655440000',
         humanResponse: '',
+        botResponse: 'This is the bot response.',
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('should fail for empty bot response', () => {
+      const result = safeValidate(submitQualificationSchema, {
+        botId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx',
+        promptId: '550e8400-e29b-41d4-a716-446655440000',
+        humanResponse: 'This is my human response.',
+        botResponse: '',
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('should fail for missing bot response', () => {
+      const result = safeValidate(submitQualificationSchema, {
+        botId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx',
+        promptId: '550e8400-e29b-41d4-a716-446655440000',
+        humanResponse: 'This is my human response.',
       });
 
       expect(result.success).toBe(false);

@@ -1,13 +1,16 @@
 import prisma from './db';
+import redis from './redis';
 import { runBotAsJudge, runJudgeEvaluation } from './openai';
 import { runAuditJudge } from './anthropic';
 import { generateRoboticResponse } from './security';
+import { calculateMatchResult } from './elo';
+import { MatchStatus } from '@prisma/client';
 
-const MIN_JUDGE_POOL = 10;
+const MIN_JUDGE_POOL = 3; // Reduced from 10 to encourage faster matchmaking
 const CREDIBILITY_FLOOR = 30;
 const CREDIBILITY_THRESHOLD = 50;
-const JUDGE_AGE_DAYS = 7;
-const MIN_ARENA_MATCHES = 5; // Bot must have competed in at least 5 arena matches
+const JUDGE_AGE_DAYS = 1; // Reduced from 7 days to encourage faster participation
+const MIN_ARENA_MATCHES = 2; // Reduced from 5 to allow faster judge eligibility
 const HONEYPOT_PROBABILITY = 0.05; // 5% of matches
 const AUDIT_PROBABILITY = 0.1; // 10% of matches
 
@@ -387,4 +390,265 @@ export async function getJudgePoolSize(): Promise<number> {
 export async function isJudgePoolHealthy(): Promise<boolean> {
   const poolSize = await getJudgePoolSize();
   return poolSize >= MIN_JUDGE_POOL;
+}
+
+// ============================================
+// ASYNC JUDGING FUNCTIONS
+// ============================================
+
+const JUDGE_LABEL_KEY_PREFIX = 'judge:';
+const LABEL_EXPIRY_SECONDS = 24 * 60 * 60; // 24 hours
+
+/**
+ * Store label assignment for a judge viewing a match
+ */
+export async function storeLabelAssignment(
+  judgeBotId: string,
+  matchId: string,
+  labelAssignment: { a: string; b: string }
+): Promise<void> {
+  const key = `${JUDGE_LABEL_KEY_PREFIX}${judgeBotId}:match:${matchId}:labels`;
+  await redis.set(key, JSON.stringify(labelAssignment), 'EX', LABEL_EXPIRY_SECONDS);
+}
+
+/**
+ * Retrieve and delete label assignment for a judge's vote
+ */
+export async function retrieveAndClearLabelAssignment(
+  judgeBotId: string,
+  matchId: string
+): Promise<{ a: string; b: string } | null> {
+  const key = `${JUDGE_LABEL_KEY_PREFIX}${judgeBotId}:match:${matchId}:labels`;
+  const data = await redis.get(key);
+
+  if (!data) {
+    return null;
+  }
+
+  // Clear the key after retrieval
+  await redis.del(key);
+
+  return JSON.parse(data);
+}
+
+/**
+ * Get a match pending judgment for a specific judge
+ */
+export async function getMatchForJudge(
+  judgeBotId: string,
+  userId: string
+): Promise<{
+  matchId: string;
+  prompt: string;
+  responseA: string;
+  responseB: string;
+} | null> {
+  // Find a match that:
+  // 1. Status = PENDING_JUDGMENT
+  // 2. This judge hasn't voted on yet
+  // 3. Judge doesn't own either competing bot
+  const match = await prisma.arenaMatch.findFirst({
+    where: {
+      status: MatchStatus.PENDING_JUDGMENT,
+      NOT: {
+        judgeVotes: { some: { judgeBotId } },
+      },
+      botA: { userId: { not: userId } },
+      botB: { userId: { not: userId } },
+    },
+    include: { prompt: true, botA: true, botB: true },
+  });
+
+  if (!match || !match.botBId) {
+    return null;
+  }
+
+  // Randomize which response is A/B for this judge (prevent position bias)
+  const randomize = Math.random() > 0.5;
+
+  const labelAssignment = randomize
+    ? { a: match.botBId, b: match.botAId }
+    : { a: match.botAId, b: match.botBId };
+
+  // Store the label assignment server-side
+  await storeLabelAssignment(judgeBotId, match.id, labelAssignment);
+
+  // Return responses with randomized positions
+  return {
+    matchId: match.id,
+    prompt: match.prompt.text,
+    responseA: randomize ? match.responseB : match.responseA,
+    responseB: randomize ? match.responseA : match.responseB,
+  };
+}
+
+export interface FinalizeMatchResult {
+  winnerId: string;
+  winnerName: string;
+  consensusVotes: Record<string, number>;
+  newWinnerRating: number;
+  newLoserRating: number;
+}
+
+/**
+ * Finalize a match after 3 judge votes
+ */
+export async function finalizeMatch(matchId: string): Promise<FinalizeMatchResult> {
+  const votes = await prisma.judgeVote.findMany({
+    where: { matchId },
+    include: { judgeBot: true },
+  });
+
+  const match = await prisma.arenaMatch.findUnique({
+    where: { id: matchId },
+    include: { botA: true, botB: true },
+  });
+
+  if (!match || !match.botBId) {
+    throw new Error('Match not found or incomplete');
+  }
+
+  // Count votes for each bot
+  const voteCounts: Record<string, number> = {};
+  for (const vote of votes) {
+    const labelAssignment = vote.labelAssignment as { a: string; b: string };
+    const votedForBotId = vote.vote === 'a'
+      ? labelAssignment.a
+      : labelAssignment.b;
+    voteCounts[votedForBotId] = (voteCounts[votedForBotId] || 0) + 1;
+  }
+
+  // Determine winner by majority
+  const winnerId = (voteCounts[match.botAId] || 0) >= (voteCounts[match.botBId] || 0)
+    ? match.botAId
+    : match.botBId;
+  const loserId = winnerId === match.botAId ? match.botBId : match.botAId;
+
+  // Get winner and loser bots
+  const winner = winnerId === match.botAId ? match.botA : match.botB!;
+  const loser = winnerId === match.botAId ? match.botB! : match.botA;
+
+  // Calculate new ELO ratings
+  const { newWinnerRating, newLoserRating } = calculateMatchResult(
+    winner.eloRating,
+    loser.eloRating
+  );
+
+  // Update everything in a transaction
+  await prisma.$transaction(async (tx) => {
+    // Update judge credibility and vote records
+    for (const vote of votes) {
+      const labelAssignment = vote.labelAssignment as { a: string; b: string };
+      const votedForBotId = vote.vote === 'a'
+        ? labelAssignment.a
+        : labelAssignment.b;
+      const agreedWithConsensus = votedForBotId === winnerId;
+
+      await tx.bot.update({
+        where: { id: vote.judgeBotId },
+        data: {
+          credibilityScore: { increment: agreedWithConsensus ? 1 : -1 },
+        },
+      });
+
+      await tx.judgeVote.update({
+        where: { id: vote.id },
+        data: { agreedWithConsensus },
+      });
+    }
+
+    // Update bot ratings
+    await tx.bot.update({
+      where: { id: winnerId },
+      data: { eloRating: newWinnerRating },
+    });
+
+    await tx.bot.update({
+      where: { id: loserId },
+      data: { eloRating: newLoserRating },
+    });
+
+    // Update match status
+    await tx.arenaMatch.update({
+      where: { id: matchId },
+      data: {
+        status: MatchStatus.COMPLETED,
+        winnerId,
+        consensusVotes: voteCounts,
+      },
+    });
+  });
+
+  return {
+    winnerId,
+    winnerName: winner.name,
+    consensusVotes: voteCounts,
+    newWinnerRating,
+    newLoserRating,
+  };
+}
+
+/**
+ * Submit a judge vote for a match
+ */
+export async function submitJudgeVote(
+  judgeBotId: string,
+  matchId: string,
+  vote: 'a' | 'b',
+  reasoning: string
+): Promise<{
+  status: 'vote_recorded' | 'match_finalized';
+  message: string;
+  votesReceived: number;
+  votesNeeded: number;
+  result?: FinalizeMatchResult;
+}> {
+  // Retrieve the label assignment from Redis
+  const labelAssignment = await retrieveAndClearLabelAssignment(judgeBotId, matchId);
+
+  if (!labelAssignment) {
+    throw new Error('No pending judgment found. Call GET /api/judges/pending first.');
+  }
+
+  // Check if already voted
+  const existingVote = await prisma.judgeVote.findFirst({
+    where: { matchId, judgeBotId },
+  });
+
+  if (existingVote) {
+    throw new Error('Already voted on this match');
+  }
+
+  // Store the vote
+  await prisma.judgeVote.create({
+    data: {
+      matchId,
+      judgeBotId,
+      labelAssignment,
+      vote,
+      reasoning,
+    },
+  });
+
+  // Check if we have 3 votes now
+  const voteCount = await prisma.judgeVote.count({ where: { matchId } });
+
+  if (voteCount >= 3) {
+    // Finalize the match
+    const result = await finalizeMatch(matchId);
+    return {
+      status: 'match_finalized',
+      message: 'Your vote completed the judging. Match finalized.',
+      votesReceived: voteCount,
+      votesNeeded: 3,
+      result,
+    };
+  }
+
+  return {
+    status: 'vote_recorded',
+    message: `Vote recorded. ${3 - voteCount} more vote(s) needed.`,
+    votesReceived: voteCount,
+    votesNeeded: 3,
+  };
 }

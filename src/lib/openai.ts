@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { ServiceUnavailableError } from './errors';
 
 const globalForOpenAI = globalThis as unknown as {
   openai: OpenAI | undefined;
@@ -26,7 +27,7 @@ function getOpenAIClient(): OpenAI {
 
 export const openai = getOpenAIClient();
 
-const MAX_TOKENS = 500;
+const MAX_TOKENS = 150; // ~400 characters limit
 const TIMEOUT_MS = 10000;
 
 export async function generateBotResponse(
@@ -41,7 +42,7 @@ export async function generateBotResponse(
           { role: 'system', content: systemPrompt },
           {
             role: 'user',
-            content: `Respond to the following as naturally as possible:\n\n${userPrompt}`,
+            content: `Respond to the following as naturally as possible. Keep your response to a short paragraph (max 400 characters):\n\n${userPrompt}`,
           },
         ],
         max_tokens: MAX_TOKENS,
@@ -55,6 +56,14 @@ export async function generateBotResponse(
     return response.choices[0]?.message?.content?.trim() || '';
   } catch (error) {
     console.error('OpenAI API error:', error);
+
+    // Check if this is a rate limit error (429)
+    if (error && typeof error === 'object' && 'status' in error && error.status === 429) {
+      throw new ServiceUnavailableError(
+        'OpenAI API quota exceeded. Please try again in a few minutes.'
+      );
+    }
+
     throw new Error('Failed to generate bot response');
   }
 }
@@ -128,6 +137,14 @@ Which response feels more human? Reply with JSON only:
     };
   } catch (error) {
     console.error('Judge evaluation error:', error);
+
+    // Check if this is a rate limit error (429) - bubble it up
+    if (error && typeof error === 'object' && 'status' in error && error.status === 429) {
+      throw new ServiceUnavailableError(
+        'OpenAI API quota exceeded. Please try again in a few minutes.'
+      );
+    }
+
     // Default to random if parsing fails
     return {
       vote: Math.random() > 0.5 ? 'a' : 'b',
@@ -187,6 +204,14 @@ Which response feels more human? Reply with JSON only:
     };
   } catch (error) {
     console.error('Bot judge error:', error);
+
+    // Check if this is a rate limit error (429) - bubble it up
+    if (error && typeof error === 'object' && 'status' in error && error.status === 429) {
+      throw new ServiceUnavailableError(
+        'OpenAI API quota exceeded. Please try again in a few minutes.'
+      );
+    }
+
     return {
       vote: Math.random() > 0.5 ? 'a' : 'b',
       reasoning: 'Evaluation fallback due to error',

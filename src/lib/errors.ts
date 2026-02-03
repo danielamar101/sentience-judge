@@ -52,6 +52,13 @@ export class RateLimitError extends AppError {
   }
 }
 
+export class ServiceUnavailableError extends AppError {
+  constructor(message = 'Service temporarily unavailable') {
+    super(message, 503, 'SERVICE_UNAVAILABLE');
+    this.name = 'ServiceUnavailableError';
+  }
+}
+
 export function handleApiError(error: unknown): Response {
   console.error('API Error:', error);
 

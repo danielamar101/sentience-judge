@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
         category: prompt.category,
       },
       botId,
-      instructions: 'Respond to this prompt as yourself. Your response will be compared against your bot\'s response. If the judge thinks your response is more human, your bot qualifies.',
+      instructions: 'Respond to this prompt as yourself in a short paragraph (max 400 characters). Your response will be compared against your bot\'s response. If the judge thinks your response is more human, your bot qualifies.',
     });
   } catch (error) {
     return handleApiError(error);

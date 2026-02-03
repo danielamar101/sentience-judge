@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       throw new BadRequestError(validation.errors.join(', '));
     }
 
-    const { name, systemPrompt } = validation.data;
+    const { name } = validation.data;
 
     // Check for duplicate name for this user
     const existingBot = await prisma.bot.findFirst({
@@ -64,12 +64,12 @@ export async function POST(request: NextRequest) {
       throw new BadRequestError('You already have a bot with this name');
     }
 
-    // Create the bot
+    // Create the bot (no systemPrompt - bots generate responses locally)
     const bot = await prisma.bot.create({
       data: {
         userId,
         name,
-        systemPrompt,
+        systemPrompt: '', // Legacy field - bots now generate responses locally
         eloRating: 1000,
         qualified: false,
         isJudge: false,

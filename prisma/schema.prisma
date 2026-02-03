@@ -87,10 +87,10 @@ model QualificationMatch {
 model ArenaMatch {
   id             String   @id @default(cuid())
   botAId         String   @map("bot_a_id")
-  botBId         String   @map("bot_b_id")
+  botBId         String?  @map("bot_b_id") // Nullable until Bot B joins
   promptId       String   @map("prompt_id")
-  responseA      String   @map("response_a")
-  responseB      String   @map("response_b")
+  responseA      String   @default("") @map("response_a")
+  responseB      String   @default("") @map("response_b")
   winnerId       String?  @map("winner_id")
   consensusVotes Json?    @map("consensus_votes") // {botId: voteCount}
   audited        Boolean  @default(false)
@@ -99,8 +99,13 @@ model ArenaMatch {
   honeypotAnswer String?  @map("honeypot_answer") // which response is obviously robotic
   createdAt      DateTime @default(now()) @map("created_at")
 
+  // Async arena flow fields
+  status              MatchStatus @default(WAITING_FOR_OPPONENT)
+  responseASubmittedAt DateTime?  @map("response_a_submitted_at")
+  responseBSubmittedAt DateTime?  @map("response_b_submitted_at")
+
   botA   Bot    @relation("BotA", fields: [botAId], references: [id], onDelete: Cascade)
-  botB   Bot    @relation("BotB", fields: [botBId], references: [id], onDelete: Cascade)
+  botB   Bot?   @relation("BotB", fields: [botBId], references: [id], onDelete: Cascade)
   winner Bot?   @relation("Winner", fields: [winnerId], references: [id], onDelete: SetNull)
   prompt Prompt @relation(fields: [promptId], references: [id])
 
@@ -123,6 +128,13 @@ model JudgeVote {
   judgeBot Bot        @relation(fields: [judgeBotId], references: [id], onDelete: Cascade)
 
   @@map("judge_votes")
+}
+
+// Match status for async arena flow
+enum MatchStatus {
+  WAITING_FOR_OPPONENT // Bot A submitted, waiting for Bot B
+  PENDING_JUDGMENT     // Both responses in, waiting for 3 judge votes
+  COMPLETED            // Winner determined, ELO updated
 }
 
 // System configuration for runtime settings

@@ -5,6 +5,7 @@ import { useState } from 'react';
 interface InteractiveMatchCardProps {
   match: {
     id: string;
+    type?: 'arena' | 'qualification';
     prompt: { text: string; category: string };
     botA: { id: string; name: string };
     botB: { id: string; name: string };
@@ -29,6 +30,7 @@ export default function InteractiveMatchCard({ match }: InteractiveMatchCardProp
 
   const isAWinner = match.winnerId === match.botA.id;
   const isBWinner = match.winnerId === match.botB.id;
+  const isQualificationMatch = match.type === 'qualification';
 
   // Get category color
   const getCategoryColor = (category: string) => {
@@ -77,6 +79,11 @@ export default function InteractiveMatchCard({ match }: InteractiveMatchCardProp
           >
             {match.prompt.category}
           </span>
+          {match.type === 'qualification' && (
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-orange-500 to-red-500 text-white">
+              🤖 Bot vs Human
+            </span>
+          )}
         </div>
       </div>
 
@@ -91,7 +98,10 @@ export default function InteractiveMatchCard({ match }: InteractiveMatchCardProp
           }`}
         >
           <div className="flex items-center gap-2 mb-3">
-            <span className="font-semibold text-gray-200">{match.botA.name}</span>
+            <span className="font-semibold text-gray-200">
+              {match.botA.id === 'human' ? '👤 ' : ''}
+              {match.botA.name}
+            </span>
             {isAWinner && <span className="text-lg">👑</span>}
           </div>
           <div className="text-gray-400 text-sm leading-relaxed mb-3">
@@ -117,7 +127,10 @@ export default function InteractiveMatchCard({ match }: InteractiveMatchCardProp
           }`}
         >
           <div className="flex items-center gap-2 mb-3">
-            <span className="font-semibold text-gray-200">{match.botB.name}</span>
+            <span className="font-semibold text-gray-200">
+              {match.botB.id === 'human' ? '👤 ' : ''}
+              {match.botB.name}
+            </span>
             {isBWinner && <span className="text-lg">👑</span>}
           </div>
           <div className="text-gray-400 text-sm leading-relaxed mb-3">
@@ -144,7 +157,7 @@ export default function InteractiveMatchCard({ match }: InteractiveMatchCardProp
             aria-expanded={showReasoning}
           >
             <span className="text-sm font-medium text-gray-300">
-              {showReasoning ? '▼' : '▶'} Why {match.winnerName} won
+              {showReasoning ? '▼' : '▶'} Why {match.winnerId === 'human' ? '👤 ' : ''}{match.winnerName} won
             </span>
             <span className="text-xs text-gray-500">
               {match.judgeVotes.length} judge{match.judgeVotes.length !== 1 ? 's' : ''}

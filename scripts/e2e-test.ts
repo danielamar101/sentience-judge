@@ -148,17 +148,13 @@ async function step4_CreateBot() {
   console.log('='.repeat(60));
 
   const botName = `TestBot_${Date.now()}`;
-  const systemPrompt = `You are ${botName}, a test bot for the Sentience Judge arena. You respond naturally and conversationally, as if you were a real person. You have opinions, preferences, and a unique perspective. You avoid AI clichés and speak like a human would.`;
 
   console.log(`\n✓ Bot name: ${botName}`);
-  console.log(`✓ System prompt: ${systemPrompt.substring(0, 80)}...`);
+  console.log(`ℹ Note: No system prompt needed - bots generate responses locally`);
 
   const data = await apiCall('/api/bots', {
     method: 'POST',
-    body: JSON.stringify({
-      name: botName,
-      systemPrompt,
-    }),
+    body: JSON.stringify({ name: botName }),
   });
 
   botId = data.bot.id;
@@ -190,18 +186,23 @@ async function step5_StartQualification() {
 }
 
 // Step 6: Submit Qualification Response
-async function step6_SubmitQualification(prompt: any) {
+async function step6_SubmitQualification(qualPrompt: any) {
   console.log('\n' + '='.repeat(60));
   console.log('STEP 6: Submit Qualification Response');
   console.log('='.repeat(60));
 
-  console.log(`\n📝 Prompt: "${prompt.text}"`);
+  console.log(`\n📝 Prompt: "${qualPrompt.text}"`);
 
   const humanResponse = await prompt(
     '\nEnter your human response to this prompt:\n> '
   );
 
+  const botResponse = await prompt(
+    '\nEnter your bot response (generated using your identity files):\n> '
+  );
+
   console.log(`\n✓ Human response: ${humanResponse.substring(0, 60)}...`);
+  console.log(`✓ Bot response: ${botResponse.substring(0, 60)}...`);
   console.log('\n⏳ Submitting for judgment...');
 
   const data = await apiCall('/api/qualification/submit', {
@@ -210,6 +211,7 @@ async function step6_SubmitQualification(prompt: any) {
       botId,
       promptId,
       humanResponse,
+      botResponse,
     }),
   });
 

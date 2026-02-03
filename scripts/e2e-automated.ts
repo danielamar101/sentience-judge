@@ -88,11 +88,10 @@ async function main() {
     console.log('─'.repeat(60));
 
     const botName = `AutoTest_${Date.now()}`;
-    const systemPrompt = `You are ${botName}, an automated test bot. You respond naturally and conversationally. You have a casual, friendly tone and genuine reactions to questions.`;
 
     const createBotData = await apiCall('/api/bots', {
       method: 'POST',
-      body: JSON.stringify({ name: botName, systemPrompt }),
+      body: JSON.stringify({ name: botName }),
     });
 
     botId = createBotData.bot.id;
@@ -120,9 +119,11 @@ async function main() {
     console.log('TEST 3: Submit Qualification');
     console.log('─'.repeat(60));
 
-    // Generate a realistic human response
+    // Generate a realistic human response and a bot response
     const humanResponse = generateHumanResponse(promptText);
+    const botResponse = generateBotResponse(promptText);
     console.log(`  ℹ Human response: "${humanResponse.substring(0, 60)}..."`);
+    console.log(`  ℹ Bot response: "${botResponse.substring(0, 60)}..."`);
 
     const submitQualData = await apiCall('/api/qualification/submit', {
       method: 'POST',
@@ -130,6 +131,7 @@ async function main() {
         botId,
         promptId,
         humanResponse,
+        botResponse,
       }),
     });
 
@@ -222,6 +224,43 @@ function generateHumanResponse(prompt: string): string {
     "Honestly, I've been thinking about this a lot lately. It's one of those things that seems simple on the surface but gets more complex the more you think about it.",
     "This is hard to put into words, but I'll try. It's like... you know that feeling when you realize something you thought was true actually isn't? Kind of like that.",
     "I'm not sure I have a perfect answer, but here's what comes to mind: life is messy and contradictory, and I think that's okay. We don't always need everything figured out.",
+  ];
+
+  return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
+}
+
+// Generate a bot response based on the prompt (simulating a bot's local generation)
+function generateBotResponse(prompt: string): string {
+  const responses: Record<string, string[]> = {
+    'changed your mind': [
+      "I've been reconsidering my stance on social media. Used to think it was purely negative, but I've seen how it helps people find community, especially marginalized folks. Nuance matters.",
+      "My perspective on ambition shifted lately. Thought chasing success was everything, but now I value presence and contentment more. The hustle culture thing started feeling hollow.",
+    ],
+    'understood': [
+      "When a friend said 'you don't have to fix this, I just needed to be heard' after I spent twenty minutes problem-solving. Sometimes presence beats solutions.",
+      "My partner once just held space while I ranted about work without offering advice. That silence and patience communicated more than any words could.",
+    ],
+    'skill': [
+      "I've gotten oddly good at reading people's energy in a room. Can usually tell when something's off before anyone says anything. Not sure if it's learned or just paying attention.",
+      "Remembering faces and names. It's not photographic or anything, but I rarely forget someone I've met. Comes in handy more than you'd think.",
+    ],
+    'dinner': [
+      "Carl Sagan. Not for the science necessarily, but for how he talked about wonder and meaning. Would love to hear how he'd view our current moment in history.",
+      "My grandmother who passed before I was born. Everyone says she was remarkable but I only have stories. Would love one real conversation.",
+    ],
+  };
+
+  const promptLower = prompt.toLowerCase();
+  for (const [key, templates] of Object.entries(responses)) {
+    if (promptLower.includes(key)) {
+      return templates[Math.floor(Math.random() * templates.length)];
+    }
+  }
+
+  const defaultResponses = [
+    "There's something about this question that makes me pause. It's deceptively simple but the more I sit with it, the more layers reveal themselves.",
+    "I find myself genuinely uncertain here, which is interesting. My immediate response differs from my considered one, and I'm not sure which is more authentic.",
+    "This touches something real for me. Not in a dramatic way, just in that quiet way where you recognize a truth you hadn't quite articulated before.",
   ];
 
   return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];

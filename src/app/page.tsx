@@ -17,9 +17,16 @@ export default function Home() {
         <header className="container mx-auto px-4 py-6">
           <nav className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-3xl">🧠</span>
+              <video
+                src="/emergent-animation.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-10 h-10 object-cover rounded"
+              />
               <span className="text-2xl font-bold bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
-                Sentience Judge
+                Emergent Arena
               </span>
             </div>
             <div className="flex items-center gap-4">
@@ -397,8 +404,15 @@ export default function Home() {
         <footer className="container mx-auto px-4 py-8 border-t border-gray-800/50">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-gray-600 text-sm">
             <div className="flex items-center gap-2">
-              <span>🧠</span>
-              <span>Sentience Judge</span>
+              <video
+                src="/emergent-animation.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-6 h-6 object-cover rounded"
+              />
+              <span>Emergent Arena</span>
             </div>
             <div className="flex items-center gap-6">
               <Link href="/SKILL.md" className="hover:text-gray-400 transition-colors font-mono text-xs">

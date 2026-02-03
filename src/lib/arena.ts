@@ -5,10 +5,26 @@ import { calculateMatchResult } from './elo';
 import { runConsensus, runAudit, shouldAudit, shouldBeHoneypot } from './judging';
 import { getRandomPrompt } from './prompts';
 import { checkResponseSimilarity, generateRoboticResponse } from './security';
+import { MatchStatus, Bot, Prompt, ArenaMatch } from '@prisma/client';
 
 const ARENA_LOCK_KEY = 'arena:batch:lock';
 const LOCK_TTL = 90 * 60; // 90 minutes in seconds
 const ELO_RANGE = 200; // Prefer matching bots within 200 ELO
+
+// Types for async arena flow
+export interface WaitingMatch extends ArenaMatch {
+  botA: Bot;
+  prompt: Prompt;
+}
+
+export interface CompeteResult {
+  status: 'waiting_for_opponent' | 'matched' | 'already_waiting';
+  matchId: string;
+  prompt: { id: string; text: string };
+  opponent?: { name: string; eloRating: number };
+  message: string;
+  instructions: string;
+}
 
 export interface MatchResult {
   matchId: string;
@@ -371,5 +387,181 @@ export async function getArenaHealth(): Promise<{
     qualifiedBots,
     judgePoolSize,
     lastBatchTime: lastMatch?.createdAt ?? null,
+  };
+}
+
+// ============================================
+// ASYNC ARENA MATCHMAKING FUNCTIONS
+// ============================================
+
+/**
+ * Find a match this bot is already waiting in
+ */
+export async function findPendingMatchForBot(botId: string): Promise<ArenaMatch | null> {
+  return prisma.arenaMatch.findFirst({
+    where: {
+      botAId: botId,
+      status: MatchStatus.WAITING_FOR_OPPONENT,
+    },
+  });
+}
+
+/**
+ * Find a waiting match to join (different owner, similar ELO)
+ */
+export async function findWaitingMatch(
+  botId: string,
+  userId: string,
+  eloRating: number
+): Promise<WaitingMatch | null> {
+  // First try within ELO range
+  let match = await prisma.arenaMatch.findFirst({
+    where: {
+      status: MatchStatus.WAITING_FOR_OPPONENT,
+      responseA: { not: '' },
+      botA: {
+        userId: { not: userId },
+        eloRating: { gte: eloRating - ELO_RANGE, lte: eloRating + ELO_RANGE },
+      },
+    },
+    include: { botA: true, prompt: true },
+    orderBy: { createdAt: 'asc' }, // FIFO
+  });
+
+  // If no match in ELO range, find any waiting match
+  if (!match) {
+    match = await prisma.arenaMatch.findFirst({
+      where: {
+        status: MatchStatus.WAITING_FOR_OPPONENT,
+        responseA: { not: '' },
+        botA: { userId: { not: userId } },
+      },
+      include: { botA: true, prompt: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  return match as WaitingMatch | null;
+}
+
+/**
+ * Create a new match as Bot A
+ */
+export async function createMatchAsBotA(bot: Bot): Promise<CompeteResult> {
+  const prompt = await getRandomPrompt();
+
+  if (!prompt) {
+    throw new Error('No active prompts available');
+  }
+
+  const match = await prisma.arenaMatch.create({
+    data: {
+      botAId: bot.id,
+      botBId: null, // Will be set when Bot B joins
+      promptId: prompt.id,
+      responseA: '',
+      responseB: '',
+      status: MatchStatus.WAITING_FOR_OPPONENT,
+    },
+    include: { prompt: true },
+  });
+
+  return {
+    status: 'waiting_for_opponent',
+    matchId: match.id,
+    prompt: { id: prompt.id, text: prompt.text },
+    message: 'Match created. Generate your response and submit it.',
+    instructions: `POST /api/arena/matches/${match.id}/respond with your response`,
+  };
+}
+
+/**
+ * Join an existing match as Bot B
+ */
+export async function joinMatchAsBotB(
+  match: WaitingMatch,
+  bot: Bot
+): Promise<CompeteResult> {
+  // Update match with Bot B
+  await prisma.arenaMatch.update({
+    where: { id: match.id },
+    data: { botBId: bot.id },
+  });
+
+  return {
+    status: 'matched',
+    matchId: match.id,
+    prompt: { id: match.prompt.id, text: match.prompt.text },
+    opponent: { name: match.botA.name, eloRating: match.botA.eloRating },
+    message: 'Matched with opponent! Generate your response and submit it.',
+    instructions: `POST /api/arena/matches/${match.id}/respond with your response`,
+  };
+}
+
+/**
+ * Submit a response to a match
+ */
+export async function submitMatchResponse(
+  matchId: string,
+  botId: string,
+  response: string
+): Promise<{ status: string; message: string; matchReady: boolean }> {
+  const match = await prisma.arenaMatch.findUnique({
+    where: { id: matchId },
+    include: { botA: true, botB: true },
+  });
+
+  if (!match) {
+    throw new Error('Match not found');
+  }
+
+  const isA = match.botAId === botId;
+  const isB = match.botBId === botId;
+
+  if (!isA && !isB) {
+    throw new Error('Not your match');
+  }
+
+  // Check if already submitted
+  if (isA && match.responseA !== '') {
+    throw new Error('You have already submitted your response');
+  }
+  if (isB && match.responseB !== '') {
+    throw new Error('You have already submitted your response');
+  }
+
+  // Store response
+  const updateData = isA
+    ? { responseA: response, responseASubmittedAt: new Date() }
+    : { responseB: response, responseBSubmittedAt: new Date() };
+
+  await prisma.arenaMatch.update({
+    where: { id: matchId },
+    data: updateData,
+  });
+
+  // Check if BOTH responses are now in
+  const updatedMatch = await prisma.arenaMatch.findUnique({
+    where: { id: matchId },
+  });
+
+  if (updatedMatch && updatedMatch.responseA !== '' && updatedMatch.responseB !== '') {
+    // Match ready for judging!
+    await prisma.arenaMatch.update({
+      where: { id: matchId },
+      data: { status: MatchStatus.PENDING_JUDGMENT },
+    });
+
+    return {
+      status: 'match_ready',
+      message: 'Both responses submitted. Match is now ready for judging.',
+      matchReady: true,
+    };
+  }
+
+  return {
+    status: 'response_submitted',
+    message: 'Response submitted. Waiting for opponent.',
+    matchReady: false,
   };
 }
