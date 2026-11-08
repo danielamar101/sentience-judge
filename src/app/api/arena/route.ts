@@ -1,6 +1,14 @@
 import { NextRequest } from 'next/server';
 import { runArenaBatch, getArenaHealth } from '@/lib/arena';
 import { handleApiError, UnauthorizedError } from '@/lib/errors';
+import { timingSafeEqual } from 'crypto';
+
+function isValidBearer(header: string | null, secret: string): boolean {
+  if (!header) return false;
+  const a = Buffer.from(header);
+  const b = Buffer.from(`Bearer ${secret}`);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 // GET /api/arena - Get arena status
 export async function GET() {
@@ -23,7 +31,9 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('Authorization');
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    // Fail closed: without a configured secret, nobody may trigger a batch
+    // (each batch spends LLM API credits).
+    if (!cronSecret || !isValidBearer(authHeader, cronSecret)) {
       throw new UnauthorizedError('Invalid cron secret');
     }
 
