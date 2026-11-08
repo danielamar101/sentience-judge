@@ -1,6 +1,6 @@
 services:
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.11.9-alpine
     ports:
       - "8080:8080"
       - "8443:8443"
@@ -33,7 +33,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:16-alpine
+    image: postgres:16.15-alpine3.24
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -48,7 +48,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.12-alpine3.21
     volumes:
       - redis_data:/data
     healthcheck:
@@ -60,13 +60,13 @@ services:
 
   # Test database (isolated)
   db-test:
-    image: postgres:16-alpine
+    image: postgres:16.15-alpine3.24
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: mirror_arena_test
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     profiles:
       - test
 

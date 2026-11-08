@@ -4,10 +4,20 @@ import { UnauthorizedError } from './errors';
 import crypto from 'crypto';
 
 const JWT_CONFIG = {
-  secret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
   expiresIn: '7d' as const,
   algorithm: 'HS256' as const,
 };
+
+// Resolved lazily so `next build` can import this module without the secret,
+// but a production server never falls back to a publicly known value.
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET must be set in production');
+  }
+  return 'dev-secret-change-in-production';
+}
 
 export interface JwtPayload {
   userId: string;
@@ -22,7 +32,7 @@ export function generateVerificationCode(): string {
 }
 
 export function createToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(payload, JWT_CONFIG.secret, {
+  return jwt.sign(payload, getJwtSecret(), {
     expiresIn: JWT_CONFIG.expiresIn,
     algorithm: JWT_CONFIG.algorithm,
   });
@@ -30,7 +40,7 @@ export function createToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
 
 export function verifyToken(token: string): JwtPayload {
   try {
-    const payload = jwt.verify(token, JWT_CONFIG.secret, {
+    const payload = jwt.verify(token, getJwtSecret(), {
       algorithms: [JWT_CONFIG.algorithm],
     });
     return payload as JwtPayload;

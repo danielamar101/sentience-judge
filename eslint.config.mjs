@@ -9,6 +9,13 @@ const eslintConfig = [
   ...nextConfig,
   ...nextCoreWebVitals,
   ...nextTypescript,
+  {
+    // New in eslint-plugin-react-hooks 7 (via eslint-config-next 16.4). Existing
+    // fetch-in-effect patterns trip it; keep it visible without failing lint.
+    rules: {
+      "react-hooks/set-state-in-effect": "warn",
+    },
+  },
 ];
 
 export default eslintConfig;
